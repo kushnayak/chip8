@@ -14,8 +14,12 @@
 Chip8::Chip8(const char *file){
     init_chip8();
     std::cout << "Initialized chip8!" << std::endl;
-    load_ROM(file); 
-    std::cout << "Loaded " << file << "!" << std::endl;
+    loaded_rom = load_ROM(file); 
+}
+
+void Chip8::cycle(){
+    fetch();
+    execute();
 }
 
 void Chip8::init_chip8(){
@@ -25,12 +29,13 @@ void Chip8::init_chip8(){
     sp = 0;
     
     memset(memory, 0, sizeof(memory));
-    memset(V, 0, 16);
+    memset(V, 0, sizeof(V));
     memset(stack, 0, sizeof(stack));
     memset(gfx, 0, sizeof(gfx));
+    memset(pressed, 0, sizeof(pressed));
     update_window_pixels();
     
-    for(uint16_t hex = 0; hex < 15; ++hex){
+    for(uint8_t hex = 0; hex < 0xF0; ++hex){
         memcpy(&memory[START_HEX_SPRITE_I + (hex * 5)], &hex_sprites[hex], 5);
     }
 
@@ -39,12 +44,12 @@ void Chip8::init_chip8(){
     rand_dist = std::uniform_int_distribution<std::mt19937::result_type>(0, 255);
 }
 
-void Chip8::load_ROM(const char *file){
+bool Chip8::load_ROM(const char *file){
     std::ifstream rom_file(file, std::ios::binary | std::ios::ate);
 
     if (!rom_file.is_open()){
         std::cout << "Could not open ROM: " << file << std::endl;
-        return;
+        return false;
     }
 
     std::streampos len = rom_file.tellg();
@@ -58,7 +63,10 @@ void Chip8::load_ROM(const char *file){
     memcpy(&memory[0x0200], buffer, len); 
 
     delete[] buffer;
+
+    return true;
 }
+
 
 void Chip8::print_gfx(){
     for(int i = 0; i < GFX_HEIGHT; ++i){
@@ -76,7 +84,6 @@ void Chip8::print_gfx(){
 void Chip8::fetch(){
     opcode = (memory[pc] << 8) | memory[pc + 1];
     pc += 2; 
-    //std::cout << "Fetched opcode: 0x" << std::hex << opcode << std::dec << std::endl;
 }
 
 void Chip8::execute(){
@@ -124,7 +131,7 @@ void Chip8::execute(){
             OP_7XNN();
             break;
 
-        case 0x8000:
+        case 0x8000: {
             switch (opcode & 0x000F){
                 case 0x0000:
                     OP_8XY0();
@@ -162,6 +169,8 @@ void Chip8::execute(){
                     OP_8XYE();
                     break;
             }
+            break;
+        }
 
         case 0x9000:
             OP_9XY0();
@@ -184,7 +193,7 @@ void Chip8::execute(){
             OP_DXYN();
             break;
 
-        case 0xE000:
+        case 0xE000: {
             switch (opcode & 0x00FF){
                 case 0x009E:
                     OP_EX9E();
@@ -194,8 +203,10 @@ void Chip8::execute(){
                     OP_EXA1();
                     break;
             }
+            break;
+        }
 
-        case 0xF000:
+        case 0xF000: {
             switch (opcode & 0x00FF){
                 case 0x0007:
                     OP_FX07();
@@ -233,6 +244,8 @@ void Chip8::execute(){
                     OP_FX65();
                     break;
             }
+            break;
+        }
 
         default:
             std::cout << "OPERATION 0x" << std::hex << opcode << " NOT FOUND." << std::dec;
@@ -240,10 +253,6 @@ void Chip8::execute(){
     }
 }
 
-void Chip8::cycle(){
-    fetch();
-    execute();
-}
 
 void Chip8::update_window_pixels(){
     for(uint16_t pos = 0; pos < GFX_HEIGHT * GFX_WIDTH; ++pos){
@@ -257,7 +266,7 @@ void Chip8::OP_00E0(){
 }
 
 void Chip8::OP_00EE(){
-    pc = stack[sp--];
+    pc = stack[--sp];
 }
 
 void Chip8::OP_1NNN(){
@@ -282,14 +291,13 @@ void Chip8::OP_4XNN(){
 }
 
 void Chip8::OP_5XY0(){
-    if (V[_X(opcode) == V[_Y(opcode)]){
+    if (V[_X(opcode)] == V[_Y(opcode)]){
         pc += 2;
     }
 }
 
 void Chip8::OP_6XNN(){
     V[_X(opcode)] = _NN(opcode);
-    std::cout << std::hex << "fetched opcode " << opcode << "; putting NN: " << +_NN(opcode) << " into register X: " << _X(opcode) << std::endl;
 }
 
 void Chip8::OP_7XNN(){
@@ -315,21 +323,13 @@ void Chip8::OP_8XY3(){
 }
 
 void Chip8::OP_8XY4(){
-    V[0xF] = 0;
     uint16_t sum = V[_X(opcode)] + V[_Y(opcode)];
-    if (sum > 0xFF){
-        V[0xF] = 1;
-        V[_X(opcode)] = 0xFF;
-    } else {
-        V[_X(opcode)] = sum;
-    }
+    V[0xF] = sum > 0xFF;
+    V[_X(opcode)] = sum;
 }
 
 void Chip8::OP_8XY5(){
-    V[0xF] = 0;
-    if (V[_X(opcode)] > V[_Y(opcode)]){
-        V[0xF] = 1;
-    }
+    V[0xF] = V[_X(opcode)] > V[_Y(opcode)];
     V[_X(opcode)] -= V[_Y(opcode)];
 }
 
@@ -339,15 +339,12 @@ void Chip8::OP_8XY6(){
 }
 
 void Chip8::OP_8XY7(){
-    V[0xF] = 0;
-    if (V[_Y(opcode)] > V[_X(opcode)]){
-        V[0xF] = 1;
-    }
-    V[_Y(opcode)] -= V[_X(opcode)];
+    V[0xF] = V[_Y(opcode)] > V[_X(opcode)];
+    V[_X(opcode)] = V[_Y(opcode)] - V[_X(opcode)];
 }
 
 void Chip8::OP_8XYE(){
-    V[0xF] = V[_X(opcode)] & 0x80;
+    V[0xF] = (V[_X(opcode)] & 0x80) >> 7;
     V[_X(opcode)] <<= 1;
 }
 
@@ -366,7 +363,7 @@ void Chip8::OP_BNNN(){
 }
 
 void Chip8::OP_CXNN(){
-    uint8_t rand_num = rand_dist(rand_num_gen());
+    uint8_t rand_num = rand_dist(rand_num_gen);
     V[_X(opcode)] = rand_num & _NN(opcode);
 }
 
@@ -375,35 +372,32 @@ void Chip8::OP_DXYN(){
     uint8_t start_col = V[_X(opcode)] % (GFX_WIDTH);
     uint8_t n = _N(opcode);
 
-    std::cout << std::hex << "Opcode: 0x" << opcode << std::endl;
-    std::cout << std::dec << "Vx: " << +V[_X(opcode)] << " Vy: " << +V[_Y(opcode)] << " n: " << +n << std::endl;
-    std::cout << std::hex << "I: 0x" << I << std::endl;
     V[0xF] = 0;
     for(uint8_t row = 0; row < n && start_row + row < GFX_HEIGHT; ++row){
         uint8_t mem_byte = memory[I + row];
-        std::cout << std::hex << "Mem byte: 0x" << +mem_byte << " @ index: 0x" << +(I + row) << std::endl;
         for(uint8_t col = 0; col < 8 && start_col + col < GFX_WIDTH; ++col){
-            std::cout << std::dec << " row: " << +row+start_row << " col: " << +col+start_col;
             uint8_t mem_pixel = (mem_byte >> (7 - col)) & 1; 
             uint8_t &gfx_pixel = gfx[(start_row + row) * GFX_WIDTH + start_col + col];
-            std::cout << std::hex << " mem byte pixel: 0x" << +mem_pixel << " gfx pixel: 0x" << +gfx_pixel;
             if (mem_pixel & gfx_pixel){
                 V[0xF] = 1;
             }
             gfx_pixel ^= mem_pixel;
-            std::cout << std::hex << "(after XOR) gfx pixel: 0x" << +gfx_pixel << std::endl;
         }
     }
 
     update_window_pixels();
 }
 
-void Chip8::EX9E(){
-
+void Chip8::OP_EX9E(){
+    if (pressed[V[_X(opcode)]]){
+        pc += 2;
+    }
 }
 
-void Chip8::EXA1(){
-
+void Chip8::OP_EXA1(){
+    if (!pressed[V[_X(opcode)]]){
+        pc += 2;
+    }
 }
 
 void Chip8::OP_FX07(){
@@ -411,7 +405,12 @@ void Chip8::OP_FX07(){
 }
 
 void Chip8::OP_FX0A(){
-    
+    for(uint8_t hex = 0x0; hex < 0xF; ++hex){
+        if (pressed[hex]){
+            V[_X(opcode)] = hex;
+            return;
+        }
+    }
 }
 
 void Chip8::OP_FX15(){

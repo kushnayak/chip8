@@ -1,7 +1,9 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <random>
+
 
 class Chip8 {
 public:
@@ -44,10 +46,16 @@ public:
     uint32_t window_pixels[GFX_HEIGHT * GFX_WIDTH];
     bool draw;
     bool bad_opcode;
+    bool pressed[16];
+    bool loaded_rom;
 
     // random stuff
     std::mt19937 rand_num_gen;
     std::uniform_int_distribution<std::mt19937::result_type> rand_dist; 
+
+    // time
+    //time_point prev_time;
+    //void update_timer();
 
     void update_window_pixels();
     void print_gfx();
@@ -55,7 +63,7 @@ public:
     Chip8(const char *file);
 
     void init_chip8();
-    void load_ROM(const char *file);
+    bool load_ROM(const char *file);
 
     void fetch();
     void execute();

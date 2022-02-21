@@ -5,7 +5,7 @@
 #include <stdexcept>
 
 Chip8 chip8("ibm.ch8");
-SDL_Graphics screen(10);
+SDL_Graphics screen(20);
 
 int main(){
     SDL_Event event;

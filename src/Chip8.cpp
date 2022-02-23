@@ -411,6 +411,7 @@ void Chip8::OP_FX0A(){
             return;
         }
     }
+    pc -= 2;
 }
 
 void Chip8::OP_FX15(){

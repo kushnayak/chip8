@@ -10,7 +10,7 @@ add_executable(${PROJECT_NAME} src/main.cpp
                                src/chip8.cpp
                                src/graphics.cpp)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/sdl2-cmake-scripts")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR})
 
 find_package(SDL2 REQUIRED)
 

@@ -54,7 +54,7 @@ int main(int argc, char **argv){
         }
         time_point now = std::chrono::high_resolution_clock::now();
         uint64_t elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_cycle).count();
-        if (elapsed < 3){
+        if (elapsed < 5){
             std::this_thread::sleep_for(std::chrono::milliseconds(3 - elapsed));
         }
 
